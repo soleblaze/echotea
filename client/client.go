@@ -23,13 +23,15 @@ func main() {
 
 	p := tea.NewProgram(initialModel(conn))
 
+	go getResponse(p, conn)
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
 type (
-	errMsg error
+	errMsg    error
+	serverMsg string
 )
 
 type model struct {
@@ -110,17 +112,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				log.Fatal(err)
 			}
 
-			msg, err := bufio.NewReader(m.conn).ReadString('\n')
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			m.messages = append(m.messages, m.senderStyle.Render("Server: ")+strings.TrimRight(msg, "\n"))
-			m.viewport.SetContent(strings.Join(m.messages, "\n"))
-
 			m.textarea.Reset()
 			m.viewport.GotoBottom()
 		}
+
+	case serverMsg:
+		m.messages = append(m.messages, m.senderStyle.Render("Server: ")+strings.TrimRight(string(msg), "\n"))
+		m.viewport.SetContent(strings.Join(m.messages, "\n"))
+		m.textarea.Reset()
+		m.viewport.GotoBottom()
 
 	case errMsg:
 		m.err = msg
@@ -136,4 +136,15 @@ func (m model) View() string {
 		m.viewport.View(),
 		m.textarea.View(),
 	) + "\n\n"
+}
+
+func getResponse(p *tea.Program, conn net.Conn) {
+	for {
+		msg, err := bufio.NewReader(conn).ReadString('\n')
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		p.Send(serverMsg(msg))
+	}
 }
