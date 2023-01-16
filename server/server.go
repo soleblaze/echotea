@@ -2,8 +2,6 @@
 package main
 
 import (
-	"fmt"
-	"io"
 	"log"
 	"net"
 )
@@ -21,32 +19,23 @@ func main() {
 
 	conn, err := server.Accept()
 	if err != nil {
-		log.Println("Failed to accept conn.", err)
+		server.Close()
+		log.Fatal(err)
 	}
 
 	for {
 		buf := make([]byte, 512)
 
 		_, err = conn.Read(buf)
-		if err == io.EOF {
-			return
-		}
-
 		if err != nil {
-			fmt.Println("Error reading:")
-			fmt.Println(err)
-
-			continue
+			log.Printf("Error reading: %s\n", err)
 		}
 
-		log.Printf("Received: %s", buf)
+		log.Printf("Received: %s\n", buf)
 
-		i, err := conn.Write([]byte(string(buf) + "\n"))
+		_, err := conn.Write([]byte(string(buf) + "\n"))
 		if err != nil {
-			fmt.Println("Error writing:")
-			fmt.Println(err)
+			log.Printf("Error writing: %s\n", err)
 		}
-
-		fmt.Printf("Wrote Message: %d\n", i)
 	}
 }
