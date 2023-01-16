@@ -39,6 +39,7 @@ type model struct {
 	senderStyle lipgloss.Style
 	err         error
 	conn        net.Conn
+	ready       bool
 }
 
 func initialModel(conn net.Conn) model {
@@ -49,7 +50,6 @@ func initialModel(conn net.Conn) model {
 	ta.Prompt = "> "
 	ta.CharLimit = 256
 
-	ta.SetWidth(60)
 	ta.SetHeight(1)
 
 	// Remove cursor line styling
@@ -57,15 +57,11 @@ func initialModel(conn net.Conn) model {
 
 	ta.ShowLineNumbers = false
 
-	vp := viewport.New(60, 20)
-	vp.SetContent("Connected to EchoTea Server. Press return to send message.")
-
 	ta.KeyMap.InsertNewline.SetEnabled(false)
 
 	return model{
 		textarea:    ta,
 		messages:    []string{},
-		viewport:    vp,
 		senderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
 		err:         nil,
 		conn:        conn,
@@ -86,6 +82,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.viewport, vpCmd = m.viewport.Update(msg)
 
 	switch msg := msg.(type) {
+
+	case tea.WindowSizeMsg:
+		if !m.ready {
+			// Since this program is using the full size of the viewport we
+			// need to wait until we've received the window dimensions before
+			// we can initialize the viewport. The initial dimensions come in
+			// quickly, though asynchronously, which is why we wait for them
+			// here.
+			m.viewport = viewport.New(msg.Width, msg.Height)
+			m.viewport.Height = msg.Height - 4
+			m.viewport.SetContent("Connected to EchoTea Server. Press return to send message.")
+			m.ready = true
+		}
+
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
@@ -112,7 +122,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.GotoBottom()
 		}
 
-	// We handle errors just like any other message
 	case errMsg:
 		m.err = msg
 		return m, nil
